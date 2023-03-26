@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Marching Squares</title>
+        <style>
+            canvas {
+                border: 4px solid #333;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="canvas" width="640" height="640"></canvas>
+        <script>
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            const gridSize = 32;
+            const cellSize = canvas.width / gridSize;
+
+            window.addEventListener("touchstart", function(event) {
+                generateNewMap();
+            });
+
+            window.addEventListener("click", function(event) {
+                generateNewMap();
+            });
+
+            const Cell = Object.freeze ({
+                empty: 0,
+                playerOne: 1,
+                playerTwo: 2,
+                wall: 3,
+
+                debug: 99
+            });
+
+            let p1SpawnLocation = { x: gridSize / 2, y: gridSize - 3 };
+            let p2SpawnLocation = { x: gridSize / 2, y: 3 };
+
+            // Generate a random grid
+            let grid = Array.from({ length: gridSize }, () => Array.from({ length: gridSize }, () => Math.random() < 0.5 ? Cell.wall : Cell.empty));
+
+            // Function to draw a single cell
+            const drawCell = (x, y) => {
+                ctx.fillRect((x-0.5) * cellSize, (y-0.5) * cellSize, cellSize, cellSize);
+            };
+
+            // Function to draw the entire grid
+            const drawGrid = () => {
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                for (let x = 0; x < gridSize; x++) {
+                    for (let y = 0; y < gridSize; y++) {
+                        //document.write(grid[x][y] + ", ");
+                        switch(grid[x][y]) {
+                            case Cell.empty:
+                            ctx.fillStyle = '#fff';
+                            drawCell(x, y);
+                            break;
+
+                            case Cell.wall:
+                            ctx.fillStyle = '#0f0';
+                            drawCell(x, y);
+                            break;
+
+                            case Cell.playerOne:
+                            ctx.fillStyle = '#00f';
+                            drawCell(x, y);
+                            break;
+
+                            case Cell.playerTwo:
+                            ctx.fillStyle = '#f00';
+                            drawCell(x, y);
+                            break;
+
+                            case Cell.debug:
+                            ctx.fillStyle = '#f0f';
+                            drawCell(x, y);
+                            break;
+
+                            default:
+                            break;
+                        }
+                    }
+                }
+            };
+
+            const isWithinBounds = (x, y) => {
+                return (x > 0 && y > 0 &&
+                        x < gridSize && y < gridSize);
+            };
+      
+            const getNumNeighbours = (x, y) => {
+                let returnValue = 0;
+                for (let i = -1; i <= 1; i++) {
+                    for (let j = -1; j <= 1; j++) {
+                        if (((x + i) > 0) &&
+                            ((x + i) < gridSize) &&
+                            ((y + j) > 0) &&
+                            ((y + j) < gridSize) &&
+                            ((i == 0 && j == 0) == false)) {
+                                if (grid[x + i][y + j] == Cell.wall) {
+                                    returnValue++;
+                                }
+                            }
+                        }
+                    }
+                    return returnValue;
+                };
+
+            const smoothMap = () => {
+                let returnGrid = new Array(gridSize).fill(null).map(() => new Array(gridSize).fill(null));
+                for (let x = 0; x < gridSize; x++) {
+                    returnGrid.push(...grid[x]);
+                    for (let y = 0; y < gridSize; y++) {
+                        let neighbours = getNumNeighbours(x, y);
+                        //document.write(neighbours + ", ");
+                        if (neighbours < 4) {
+                            returnGrid[x][y] = Cell.empty;
+                        } else if (neighbours > 4) {
+                            returnGrid[x][y] = Cell.wall;
+                        } else {
+                            returnGrid[x][y] = grid[x][y];
+                        }
+                    }
+                }
+                for (let x = 0; x < gridSize; x++) {
+                    for (let y = 0; y < gridSize; y++) {
+                        grid[x][y] = returnGrid[x][y];
+                    }
+                }
+                //drawGrid();
+            };
+      
+            // Function to get the configuration of a cell based on its neighbors
+            const getCellConfiguration = (x, y) => {
+                const topLeft = grid[x][y + 1] == Cell.wall ? 1 : 0;
+                const topRight = grid[x + 1][y + 1] == Cell.wall ? 1 : 0;
+                const bottomLeft = grid[x][y] == Cell.wall ? 1 : 0;
+                const bottomRight = grid[x + 1][y] == Cell.wall ? 1 : 0;
+                return (topLeft << 3) | (topRight << 2) | (bottomRight << 1) | bottomLeft;
+            };
+
+            // Function to draw the marching squares algorithm
+            const drawMarchingSquares = () => {
+                ctx.strokeStyle = '#f00';
+                ctx.lineWidth = 2;
+
+                for (let x = 0; x < gridSize; x++) {
+                    for (let y = 0; y < gridSize; y++) {
+                        const cellConfiguration = getCellConfiguration(x, y);
+                        if (cellConfiguration === 0 || cellConfiguration === 15) {
+                            continue;
+                        }
+            
+                        const leftX = (x * cellSize);
+                        const leftY = ((y + 0.5) * cellSize);
+                        const rightX = (x + 1) * cellSize;
+                        const rightY = ((y + 0.5) * cellSize);
+                        const topX = ((x + 0.5) * cellSize);
+                        const topY = (y + 1) * cellSize;
+                        const bottomX = ((x + 0.5) * cellSize);
+                        const bottomY = y * cellSize;
+
+                        ctx.beginPath();
+
+                        switch (cellConfiguration) {
+                            case 1:
+                            ctx.moveTo(leftX, leftY);
+                            ctx.lineTo(bottomX, bottomY);
+                            break;
+
+                            case 2:
+                            ctx.moveTo(rightX, rightY);
+                            ctx.lineTo(bottomX, bottomY);
+                            break;
+            
+                            case 3:
+                            ctx.moveTo(leftX, leftY);
+                            ctx.lineTo(rightX, rightY);
+                            break;
+
+                            case 4:
+                            ctx.moveTo(rightX, rightY);
+                            ctx.lineTo(topX, topY);
+                            break;
+
+                            case 5:
+                            ctx.moveTo(leftX, leftY);
+                            ctx.lineTo(topX, topY);
+                            ctx.moveTo(rightX, rightY);
+                            ctx.lineTo(bottomX, bottomY);
+                            break;
+
+                            case 6:
+                            ctx.moveTo(topX, topY);
+                            ctx.lineTo(bottomX, bottomY);
+                            break;
+
+                            case 7:
+                            ctx.moveTo(leftX, leftY);
+                            ctx.lineTo(topX, topY);
+                            break;
+
+                            case 8:
+                            ctx.moveTo(leftX, leftY);
+                            ctx.lineTo(topX, topY);
+                            break;
+
+                            case 9:
+                            ctx.moveTo(topX, topY);
+                            ctx.lineTo(bottomX, bottomY);
+                            break;
+
+                            case 10:
+                            ctx.moveTo(leftX, leftY);
+                            ctx.lineTo(bottomX, bottomY);
+                            ctx.moveTo(rightX, rightY);
+                            ctx.lineTo(topX, topY);
+                            break;
+
+                            case 11:
+                            ctx.moveTo(rightX, rightY);
+                            ctx.lineTo(topX, topY);
+                            break;
+
+                            case 12:
+                            ctx.moveTo(leftX, leftY);
+                            ctx.lineTo(rightX, rightY);
+                            break;
+
+                            case 13:
+                            ctx.moveTo(rightX, rightY);
+                            ctx.lineTo(bottomX, bottomY);
+                            break;
+
+                            case 14:
+                            ctx.moveTo(leftX, leftY);
+                            ctx.lineTo(bottomX, bottomY);
+                            break;
+                        }
+                        ctx.stroke();
+                    }
+                }
+            };
+
+            const heuristic = (pos1, pos2) => {
+                // Manhattan distance heuristic
+                return Math.abs(pos1.x - pos2.x) + Math.abs(pos1.y - pos2.y);
+            };
+            
+            const aStar = (startPos, targetPos) => {
+                const openSet = [startPos];
+                const closedSet = new Set();
+            
+                const prev = new Map();
+                const gScore = new Map();
+                gScore.set(startPos, 0);
+            
+                const fScore = new Map();
+                fScore.set(startPos, heuristic(startPos, targetPos));
+            
+                while (openSet.length > 0) {
+                    const currentPos = openSet.reduce(
+                        (prev, curr) => (fScore.get(curr) < fScore.get(prev) ? curr : prev),
+                        openSet[0]
+                    );
+            
+                    if (currentPos.x === targetPos.x && currentPos.y === targetPos.y) {
+                        // Path found!
+                        const path = [currentPos];
+                        let prevPos = currentPos;
+                        while (prevPos.x !== startPos.x || prevPos.y !== startPos.y) {
+                            prevPos = prev.get(prevPos);
+                            path.push(prevPos);
+                        }
+                        return path.reverse();
+                    }
+            
+                    openSet.splice(openSet.indexOf(currentPos), 1);
+                    closedSet.add(currentPos);
+            
+                    for (const neighbor of getNeighbors(currentPos, grid)) {
+                        if (closedSet.has(neighbor)) {
+                            continue;
+                        }
+            
+                        const tentativeGScore = gScore.get(currentPos) + 1;
+            
+                        if (!openSet.includes(neighbor)) {
+                            openSet.push(neighbor);
+                        } else if (tentativeGScore >= gScore.get(neighbor)) {
+                            continue;
+                        }
+            
+                        prev.set(neighbor, currentPos);
+                        gScore.set(neighbor, tentativeGScore);
+                        fScore.set(
+                            neighbor,
+                            tentativeGScore + heuristic(neighbor, targetPos)
+                        );
+                    }
+                }
+            
+                // Path not found
+                return null;
+            };
+              
+            const getNeighbors = (pos, grid) => {
+                const neighbors = [];
+        
+                for (const [dx, dy] of [[-1, 0], [0, -1], [1, 0], [0, 1]]) {
+                    const neighborPos = { x: pos.x + dx, y: pos.y + dy };
+                    if (neighborPos.x < 0 ||
+                        neighborPos.x >= grid.length ||
+                        neighborPos.y < 0 ||
+                        neighborPos.y >= grid[0].length ||
+                        grid[neighborPos.x][neighborPos.y] === Cell.wall
+                        ) {
+                            continue;
+                        }
+                        neighbors.push(neighborPos);
+                    }
+        
+                    return neighbors;
+                };
+            
+            const setSurroundingCells = (x, y, cell) => {
+                for (let i = -1; i <= 1; i++) {
+                    for (let j = -1; j <= 1; j++) {
+                        if (!(i == 0 && j == 0)) {
+                            grid[x + i][y + j] = cell;
+                        }
+                    }
+                }
+            }
+
+            const spawnPlayers = () => {
+                grid[p1SpawnLocation.x][p1SpawnLocation.y] = Cell.playerOne;
+                setSurroundingCells(p1SpawnLocation.x, p1SpawnLocation.y, Cell.empty);
+
+                grid[p2SpawnLocation.x][p2SpawnLocation.y] = Cell.playerTwo;
+                setSurroundingCells(p2SpawnLocation.x, p2SpawnLocation.y, Cell.empty);
+            }
+
+            const generateNewMap = () => {
+                grid = Array.from({ length: gridSize }, () => Array.from({ length: gridSize }, () => Math.random() < 0.5 ? Cell.wall : Cell.empty));
+
+                for (let i = 0; i < 5; i++) {
+                    smoothMap();
+                }
+                spawnPlayers();
+                drawGrid();
+                //document.write(grid);
+    
+                //let debugPath = aStar(p1SpawnLocation, p2SpawnLocation);
+    
+                drawMarchingSquares();
+            }
+
+            generateNewMap();
+  
+        </script>
+    </body>
+</html>
